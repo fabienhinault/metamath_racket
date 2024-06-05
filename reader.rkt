@@ -1,4 +1,6 @@
-#lang racket
+#lang br/quicklang
+
+(require racket)
 (require (for-syntax racket))
 
 (module+ test
@@ -6,6 +8,9 @@
 
 (module+ test-for-syntax
   (require (for-syntax rackunit)))
+
+(define (quote-cdr l)
+  (cons (car l) (map (λ (_) (list 'quote _)) (cdr l))))
 
 (define (read-syntax path port)
   (define src-datums (port->list read port))
@@ -15,47 +20,51 @@
 
 (provide read-syntax)
 
-
-
-(define-syntax (metamath-module-begin EXPR ...)
+(define-macro (metamath-module-begin EXPR ...)
   #'(#%module-begin EXPR ...))
-(provide (rename-out [metamath-module-begin #%module-begin]))
 
-;(define-syntax-parameter constants*
-;  (λ (stx) '()))
-;
-;(define-syntax-parameter variables*
-;  (λ (stx) '()))
-;
-;(define-syntax-parameter floating-hypotheses*
-;  (λ (stx) '()))
+(provide (rename-out [metamath-module-begin #%module-begin]))
 
 (define constants* '())
 (define variables* '())
 (define floating-hypotheses* '())
+(define provables* '())
 
-(define ($c . constants-symbols)
+(define-macro ($c . CONSTANTS)
+  #'(add-constants 'CONSTANTS))
+
+(define (add-constants constants-symbols)
   (set! constants* (append constants* constants-symbols)))
 
-(define ($v variable-symbols)
+
+(define-macro ($v . VARIABLES)
+  #'(add-variables 'VARIABLES))
+
+(define (add-variables variable-symbols)
   (set! variables* (append variables* variable-symbols)))
 
-(define ($f constant variable)
+(define-macro ($f NAME CONSTANT VARIABLE)
+  #'(define NAME (add-floating-hypothesis 'NAME 'CONSTANT 'VARIABLE)))
+
+(define (add-floating-hypothesis name constant variable)
   (when (not (member constant constants*))
     (error (~a constant " is not a constant.")))
   (when (not (member variable variables*))
     (error (~a variable " is not a variable.")))
-  (let ((res (create-floating-hypothesis constant variable)))
+  (let ((res (create-floating-hypothesis name constant variable)))
     (set! floating-hypotheses* (append floating-hypotheses* (list res)))
     res))
 
-(define (create-floating-hypothesis constant variable)
+(define (create-floating-hypothesis name constant variable)
   (cons variable
-        (hash 'statement (list constant variable)
-              'step (λ (stack pds) (cons (list constant variable) stack)))))
+        (hash
+         'name name
+         'statement (list constant variable)
+         'step (λ (stack pds) (cons (list constant variable) stack)))))
 
 (module+ test
-  (let ((hyp-term-u (cdr (create-floating-hypothesis 'term 'u))))
+  (let ((hyp-term-u (cdr (create-floating-hypothesis 'tu 'term 'u))))
+    (check-equal? (hash-ref hyp-term-u 'name) 'tu)
     (check-equal? (hash-ref hyp-term-u 'statement) '(term u))
     (check-equal? ((hash-ref hyp-term-u 'step) '() '()) '((term u)))))
                 
@@ -67,7 +76,7 @@
    (get-present-variables '((TT P) (TT (-> P Q))) '(u r s P Q))
    '(P Q)))
 
-; extract from floatings the floating hypotheses needed by essentials
+; extract from all-floatings the floating hypotheses needed by essentials
 (define (get-floating-hypotheses essentials all-floatings all-variables)
   (let ((vs  (get-present-variables essentials all-variables)))
     (map (λ (_) (hash-ref (cdr _) 'statement)) (filter (λ (_) (member (car _) vs)) all-floatings))))
@@ -75,11 +84,12 @@
 (module+ test
   (define (create-floating-hypotheses cvs)
     (map (λ (cv)
-           (create-floating-hypothesis (car cv) (cadr cv)))
+           (create-floating-hypothesis (car cv) (cadr cv) (caddr cv)))
          cvs))
   (define test-consts '(term wff + 0 = TT |(| |)|))
   (define test-vars '(u r s P Q))
-  (define test-floats (create-floating-hypotheses '((term u) (term r) (term s) (wff P) (wff Q))))
+  (define test-floats (create-floating-hypotheses '((tu term u) (tr term r) (ts term s)
+                                                                (wp wff P) (wq wff Q))))
   (check-equal?
    (get-floating-hypotheses '((TT P) (TT (-> P Q))) test-floats test-vars)
    '((wff P) (wff Q))))
@@ -175,6 +185,9 @@
         (list statement-symbol)
         (cdr binding))))
 
+(define-macro ($a NAME ESSENTIALS DISTINCTS CONCLUSION)
+  #'(define NAME (create-axiom 'ESSENTIALS 'DISTINCTS 'CONCLUSION
+                               floating-hypotheses* variables* constants*)))
          
 (define (create-axiom essentials distincts conclusion all-floatings all-variables all-consts)
   (let* ((ees (evenths essentials))
@@ -198,10 +211,10 @@
          (tpl-step (hash-ref tpl 'step)))
     (check-equal? (tpl-step '((term u) (term 0)) '()) '((term |(| u + 0 |)|))))
   
-  (let* ((weq (create-axiom '() '() '(wff |(| u = r |)|) test-floats test-vars test-consts))
+  (let* ((weq (create-axiom '() '() '(wff u = r) test-floats test-vars test-consts))
          (weq-step (hash-ref weq 'step)))
     (check-equal? (weq-step '((term |(| u + 0 |)|) (term u)) '())
-                  '((wff |(| |(| u + 0 |)| = u |)|))))
+                  '((wff |(| u + 0 |)| = u))))
   
 ;  (let* ((mp (create-axiom '(min (TT P) maj (TT (P -> Q))) '() '(TT Q)))
 ;         (mp-step (hash-ref mp 'step))
@@ -213,6 +226,39 @@
 ;    (check-equal? ))
   )
 
+
+(define-macro ($p NAME ESSENTIALS DISTINCTS CONCLUSION (PROOF ... ))
+  #'(define NAME (add-provable 'NAME 'ESSENTIALS 'DISTINCTS 'CONCLUSION (list PROOF ...)
+                              floating-hypotheses* variables* constants*)))
+               
+(define (add-provable name essentials distincts conclusion proof
+                      all-floatings all-variables all-consts)
+  (let ((provable (create-provable name essentials distincts conclusion proof
+                               all-floatings all-variables all-consts)))
+    (set! provables* (cons provable provables*))
+    provable))
+
+(define (create-provable name essentials distincts conclusion proof
+                         all-floatings all-variables all-consts)
+  (let ((provable (create-axiom essentials distincts conclusion
+                         all-floatings all-variables all-consts)))
+    (hash-set provable 'verify
+              (λ (debug)
+                (let ((stack '()))
+                  (map
+                   (λ (statement)
+                     (set! stack ((hash-ref statement 'step) stack distincts))
+                     (when debug (print stack)))
+                   proof)
+                  (when (not (equal? stack '(,conclusion)))
+                    (error "MM verify: " name stack)))))))
+                  
+
+(define (verify-all debug)
+  (for-each
+   (λ (p) ((hash-ref p 'verify) debug))
+   provables*))
+    
 (define (check-ds distincts previous-distincts)
   '())
 
@@ -224,18 +270,8 @@
             d))
     ds))
 
-;(define-syntax $a
-;  (syntax-rules ()
-;    (($a name es ds ccl)
-;     (define name (create-axiom es ds ccl)))))
-;               
-;
-;
-;
-;(provide
-; $c 
-; $v add-variables
-; $f create-floating-hypothesis
-; constants* variables* floating-hypotheses* )
 
-(provide $c $v )
+
+(define th1 '())
+(provide $c $v $f $a $p verify-all false true th1)
+    ;constants* variables* floating-hypotheses* tze)
