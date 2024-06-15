@@ -91,7 +91,7 @@
   (define test-floats (create-floating-hypotheses '((tu term u) (tr term r) (ts term s)
                                                                 (wp wff P) (wq wff Q))))
   (check-equal?
-   (get-floating-hypotheses '((TT P) (TT (-> P Q))) test-floats test-vars)
+   (get-floating-hypotheses '((TT P) (TT  |(| P -> Q |)|)) test-floats test-vars)
    '((wff P) (wff Q))))
 
 
@@ -215,6 +215,10 @@
          (weq-step (hash-ref weq 'step)))
     (check-equal? (weq-step '((term |(| u + 0 |)|) (term u)) '())
                   '((wff |(| u + 0 |)| = u))))
+
+  (let* ((p (create-axiom '() '() '(TT |(| u = u |)|) test-floats test-vars test-consts))
+         (p-step (hash-ref p 'step)))
+    (check-equal? (p-step '((term u)) '()) '((TT |(| u = u |)|))))
   
 ;  (let* ((mp (create-axiom '(min (TT P) maj (TT (P -> Q))) '() '(TT Q)))
 ;         (mp-step (hash-ref mp 'step))
@@ -252,13 +256,24 @@
                    proof)
                   (when (not (equal? stack '(,conclusion)))
                     (error "MM verify: " name stack)))))))
-                  
+  
+(module+ test                
+
+  (let* ((p (create-provable 'p '() '() '(TT |(| u = u |)|) '() test-floats test-vars test-consts))
+         (p-step (hash-ref p 'step))
+         (p-verify (hash-ref p 'verify)))
+    (check-equal? (p-step '((term u)) '()) '((TT |(| u = u |)|))))
+
+)
+
+(define (verify-proof provable debug)
+  ((hash-ref provable 'verify) debug))
 
 (define (verify-all debug)
   (for-each
    (λ (p) ((hash-ref p 'verify) debug))
    provables*))
-    
+
 (define (check-ds distincts previous-distincts)
   '())
 
@@ -273,5 +288,4 @@
 
 
 (define th1 '())
-(provide $c $v $f $a $p verify-all false true th1)
-    ;constants* variables* floating-hypotheses* tze)
+(provide $c $v $f $a $p verify-all false true th1 constants* variables* floating-hypotheses*)

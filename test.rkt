@@ -17,7 +17,7 @@
 ($a a2 () () (TT |(| u + 0 |)| = u))
 ($a mp (min (TT P) maj (TT |(| P -> Q |)|)) () (TT Q))
 
-($p th1 () () (TT (= u u))
+($p th1 () () (TT |(| u = u |)|)
     (tu tze tpl tu weq tu tu weq tu a2 tu tze tpl
      tu weq tu tze tpl tu weq tu tu weq wim tu a2
      tu tze tpl tu tu a1 mp mp))
