@@ -3,6 +3,7 @@
 ; comment
 ($c + = -> term wff TT 0 |(| |)|)
 ($v u r s P Q)
+
 ($f tu term u)
 ($f tr term r)
 ($f ts term s)

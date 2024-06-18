@@ -37,36 +37,50 @@
   (set! constants* (append constants* constants-symbols)))
 
 
+(module+ test
+  ($c + = -> term wff TT 0 |(| |)|)
+  (check-equal? constants* '(+ = -> term wff TT 0 |(| |)|))
+  )
+
 (define-macro ($v . VARIABLES)
   #'(add-variables 'VARIABLES))
+
+
+(module+ test
+  ($v u r s P Q)
+  (check-equal? variables* '(u r s P Q))
+  )
 
 (define (add-variables variable-symbols)
   (set! variables* (append variables* variable-symbols)))
 
 (define-macro ($f NAME CONSTANT VARIABLE)
-  #'(define NAME (add-floating-hypothesis 'NAME 'CONSTANT 'VARIABLE)))
+  #'(define NAME (add-floating-hypothesis 'CONSTANT 'VARIABLE)))
 
-(define (add-floating-hypothesis name constant variable)
+(define (add-floating-hypothesis constant variable)
   (when (not (member constant constants*))
     (error (~a constant " is not a constant.")))
   (when (not (member variable variables*))
     (error (~a variable " is not a variable.")))
-  (let ((res (create-floating-hypothesis name constant variable)))
-    (set! floating-hypotheses* (append floating-hypotheses* (list res)))
+  (let ((res (create-floating-hypothesis constant variable)))
+    (set! floating-hypotheses* (cons (cons variable res) floating-hypotheses*))
     res))
 
-(define (create-floating-hypothesis name constant variable)
-  (cons variable
-        (hash
-         'name name
-         'statement (list constant variable)
-         'step (λ (stack pds) (cons (list constant variable) stack)))))
+(define (create-floating-hypothesis constant variable)
+  (hash
+   'statement (list constant variable)
+   'step (λ (stack pds) (cons (list constant variable) stack))))
 
 (module+ test
-  (let ((hyp-term-u (cdr (create-floating-hypothesis 'tu 'term 'u))))
-    (check-equal? (hash-ref hyp-term-u 'name) 'tu)
+  (let ((hyp-term-u (create-floating-hypothesis 'term 'u)))
     (check-equal? (hash-ref hyp-term-u 'statement) '(term u))
-    (check-equal? ((hash-ref hyp-term-u 'step) '() '()) '((term u)))))
+    (check-equal? ((hash-ref hyp-term-u 'step) '() '()) '((term u))))
+
+  ($f tu term u)
+  (check-equal? (hash-ref tu 'statement) '(term u))
+  (check-equal? floating-hypotheses* (list (cons 'u tu)))
+  (check-equal? ((hash-ref tu 'step) '() '()) '((term u)))
+  )
                 
 (define (get-present-variables essentials all-variables)
   (remove-duplicates (filter (λ (_) (member _ all-variables)) (flatten essentials))))
@@ -76,24 +90,32 @@
    (get-present-variables '((TT P) (TT (-> P Q))) '(u r s P Q))
    '(P Q)))
 
+(define (vars->floatings vars all-floatings)
+  (map (λ (var) (assoc var all-floatings)) vars))
+
 ; extract from all-floatings the floating hypotheses needed by essentials
 (define (get-floating-hypotheses essentials all-floatings all-variables)
-  (let ((vs  (get-present-variables essentials all-variables)))
-    (map (λ (_) (hash-ref (cdr _) 'statement)) (filter (λ (_) (member (car _) vs)) all-floatings))))
+  (let ((vars  (get-present-variables essentials all-variables)))
+    (map (λ (var-float) (hash-ref (cdr var-float) 'statement)) (vars->floatings vars all-floatings))))
 
 (module+ test
   (define (create-floating-hypotheses cvs)
     (map (λ (cv)
-           (create-floating-hypothesis (car cv) (cadr cv) (caddr cv)))
+           (let ((var (cadr cv)))
+             (cons var (create-floating-hypothesis (car cv) var))))
          cvs))
   (define test-consts '(term wff + 0 = TT |(| |)|))
   (define test-vars '(u r s P Q))
-  (define test-floats (create-floating-hypotheses '((tu term u) (tr term r) (ts term s)
-                                                                (wp wff P) (wq wff Q))))
+  (define test-floats (create-floating-hypotheses '((term u) (term r) (term s)
+                                                             (wff P) (wff Q))))
+  (check-equal?
+   (map (λ (var-float) (hash-ref (cdr var-float) 'statement))
+        (vars->floatings '(P Q) test-floats))
+   '((wff P) (wff Q)))
   (check-equal?
    (get-floating-hypotheses '((TT P) (TT  |(| P -> Q |)|)) test-floats test-vars)
-   '((wff P) (wff Q))))
-
+   '((wff P) (wff Q)))
+  )
 
 (define (evenths l)
   (cond ((null? l) '())
@@ -107,8 +129,6 @@
   (if (pair? tree)
       (combine (treewise combine base (car tree)) (treewise combine base (cdr tree)))
       (base tree)))
-
-(module+ test-for-syntax)
 
 (define (bind-hypothesis hypothesis statement all-variables all-constants)
   (cond
@@ -138,6 +158,10 @@
   (check-equal?
    (bind-hypothesis '(term r) '(term 0) test-vars test-consts)
    '((r 0)))
+
+  (check-equal?
+   (bind-hypothesis '(term u) '(term |(| u + 0 |)|) test-vars test-consts)
+   '((u . (|(| u + 0 |)|))))
 
   (check-equal?
    (bind-hypothesis '(term u) '(term |(| u + 0 |)|) test-vars test-consts)
@@ -206,28 +230,85 @@
   (let* ((tze (create-axiom '() '() '(term 0) test-floats test-vars test-consts))
          (tze-step (hash-ref tze 'step)))
     (check-equal? (tze-step '() '()) '((term 0))))
-  
+
   (let* ((tpl (create-axiom '() '() '(term |(| u + r |)|) test-floats test-vars test-consts))
          (tpl-step (hash-ref tpl 'step)))
     (check-equal? (tpl-step '((term u) (term 0)) '()) '((term |(| u + 0 |)|))))
-  
+
   (let* ((weq (create-axiom '() '() '(wff u = r) test-floats test-vars test-consts))
          (weq-step (hash-ref weq 'step)))
     (check-equal? (weq-step '((term |(| u + 0 |)|) (term u)) '())
                   '((wff |(| u + 0 |)| = u))))
 
-  (let* ((p (create-axiom '() '() '(TT |(| u = u |)|) test-floats test-vars test-consts))
-         (p-step (hash-ref p 'step)))
-    (check-equal? (p-step '((term u)) '()) '((TT |(| u = u |)|))))
+  (let* ((th1 (create-axiom '() '() '(TT u = u ) test-floats test-vars test-consts))
+         (th1-step (hash-ref th1 'step)))
+    (check-equal? (th1-step '((term u)) '()) '((TT u = u))))
   
-;  (let* ((mp (create-axiom '(min (TT P) maj (TT (P -> Q))) '() '(TT Q)))
-;         (mp-step (hash-ref mp 'step))
-;         (tu '(term u))
-;         (tze '(term 0))
-;         (tpl '(term |(| u + r |)| ))
-;         (weq '(wff |(| u = r |)|))
-;         (stack (list tu tze tpl tu weq tu tu weq)))
-;    (check-equal? ))
+  (let* ((mp (create-axiom '(min (TT P) maj (TT |(| P -> Q |)|)) '() '(TT Q)
+                           test-floats test-vars test-consts))
+         (mp-step (hash-ref mp 'step)))
+    (check-equal? (mp-step
+                   '((wff P)
+                     (wff Q )
+                     (TT P)
+                     (TT |(| P -> Q |)| ))
+                   '())
+                  '((TT Q)))
+    (check-equal? (mp-step
+                   '((wff |(| u + 0 |)| = u)
+                     (wff u = u)
+                     (TT |(| u + 0 |)| = u)
+                     (TT |(| |(| u + 0 |)| = u -> u = u |)|))
+                   '())
+                  '((TT u = u)))
+    )
+
+  ($a tze () () (term 0))
+  (check-equal? ((hash-ref tze 'step) '() '()) '((term 0)))
+  ($f tr term r)
+  ($a tpl () () (term |(| u + r |)|))
+  (check-equal?
+   ((hash-ref tpl 'step)
+    '((term 0) (term u))
+    '())
+   '((term |(| 0 + u |)|)))
+  ($a weq () () (wff u = r))
+  (check-equal?
+   ((hash-ref weq 'step)
+    '((term u) (term |(| 0 + u |)|))
+    '())
+   '((wff u = |(| 0 + u |)|)))
+  ($f wp wff P)
+  ($f wq wff Q)
+  ($a wim () () (wff |(| P -> Q |)|))
+  (check-equal?
+   ((hash-ref wim 'step)
+    '((wff u = u) (wff u = |(| 0 + u |)|))
+    '())
+   '((wff |(| u = u -> u = |(| 0 + u |)| |)| )))
+  ($f ts term s)
+  ($a a1 () () (TT |(| u = r -> |(| u = s -> r = s |)| |)| ))
+  (check-equal?
+   ((hash-ref a1 'step)
+    '((term u) (term u) (term |(| 0 + u |)| ))
+    '())
+   '((TT |(| u = u -> |(| u = |(| 0 + u |)| -> u = |(| 0 + u |)| |)| |)|)))
+  ($a a2 () () (TT |(| u + 0 |)| = u))
+  (check-equal?
+   ((hash-ref a2 'step)
+    '((term u))
+    '())
+   '((TT |(| u + 0 |)| = u)))
+  ($a mp (min (TT P) maj (TT |(| P -> Q |)|)) () (TT Q))
+  (check-equal?
+   ((hash-ref mp 'step)
+    '((wff |(| u + 0 |)| = u)
+      (wff u = u)
+      (TT |(| u + 0 |)| = u)
+      (TT |(| |(| u + 0 |)| = u -> u = u |)|))
+    '())
+   '((TT u = u)))
+
   )
 
 
@@ -252,18 +333,22 @@
                   (map
                    (λ (statement)
                      (set! stack ((hash-ref statement 'step) stack distincts))
-                     (when debug (print stack)))
+                     (when debug (displayln stack)))
                    proof)
                   (when (not (equal? stack '(,conclusion)))
                     (error "MM verify: " name stack)))))))
   
 (module+ test                
-
-  (let* ((p (create-provable 'p '() '() '(TT |(| u = u |)|) '() test-floats test-vars test-consts))
-         (p-step (hash-ref p 'step))
-         (p-verify (hash-ref p 'verify)))
-    (check-equal? (p-step '((term u)) '()) '((TT |(| u = u |)|))))
-
+  (let* ((th1 (create-provable 'p '() '() '(TT |(| u = u |)|)
+                             (list tu tze tpl tu weq tu tu weq tu a2 tu tze tpl
+                                   tu weq tu tze tpl tu weq tu tu weq wim tu a2
+                                   tu tze tpl tu tu a1 mp mp)
+                             test-floats test-vars test-consts))
+         (p-step (hash-ref th1 'step))
+         (p-verify (hash-ref th1 'verify)))
+    (check-equal? (p-step '((term u)) '()) '((TT |(| u = u |)|)))
+    (p-verify true)
+    )
 )
 
 (define (verify-proof provable debug)
