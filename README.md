@@ -1,9 +1,9 @@
 # metamath_racket
-metamath implementation in racket
+[Metamath](https://us.metamath.org/) implementation in [Racket](https://racket-lang.org/)
 
-exercise for Beautiful Racket
+exercise for [Beautiful Racket](https://beautifulracket.com)
 
-Metamath is a language for formal mathematical proofs.
+Metamath is a [language](https://us.metamath.org/downloads/metamath.pdf) for formal mathematical proofs.
 
 Here we have a partial implementation:
  - distinct variables are not checked
