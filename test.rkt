@@ -14,7 +14,7 @@
 ($a tpl () () (term |(| u + r |)|))
 ($a weq () () (wff u = r))
 ($a wim () () (wff |(| P -> Q |)|))
-($a a1 () () (TT |(| u = r -> |(| u = s -> r = s |)|))
+($a a1 () () (TT |(| u = r -> |(| u = s -> r = s |)| |)|))
 ($a a2 () () (TT |(| u + 0 |)| = u))
 ($a mp (min (TT P) maj (TT |(| P -> Q |)|)) () (TT Q))
 

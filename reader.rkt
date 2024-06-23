@@ -244,24 +244,24 @@
          (th1-step (hash-ref th1 'step)))
     (check-equal? (th1-step '((term u)) '()) '((TT u = u))))
   
-;  (let* ((mp (create-axiom '(min (TT P) maj (TT |(| P -> Q |)|)) '() '(TT Q)
-;                           test-floats test-vars test-consts))
-;         (mp-step (hash-ref mp 'step)))
-;    (check-equal? (mp-step
-;                   '((TT |(| P -> Q |)| )
-;                     (TT P)
-;                     (wff Q)
-;                     (wff P))
-;                   '())
-;                  '((TT Q)))
-;    (check-equal? (mp-step
-;                   '((TT |(| |(| u + 0 |)| = u -> u = u |)|)
-;                     (TT |(| u + 0 |)| = u)
-;                     (wff u = u)
-;                     (wff |(| u + 0 |)| = u))
-;                   '())
-;                  '((TT u = u)))
-;    )
+  (let* ((mp (create-axiom '(min (TT P) maj (TT |(| P -> Q |)|)) '() '(TT Q)
+                           test-floats test-vars test-consts))
+         (mp-step (hash-ref mp 'step)))
+    (check-equal? (mp-step
+                   '((TT |(| P -> Q |)| )
+                     (TT P)
+                     (wff Q)
+                     (wff P))
+                   '())
+                  '((TT Q)))
+    (check-equal? (mp-step
+                   '((TT |(| |(| u + 0 |)| = u -> u = u |)|)
+                     (TT |(| u + 0 |)| = u)
+                     (wff u = u)
+                     (wff |(| u + 0 |)| = u))
+                   '())
+                  '((TT u = u)))
+    )
 
   ($a tze () () (term 0))
   (check-equal? ((hash-ref tze 'step) '() '()) '((term 0)))
@@ -363,10 +363,14 @@
 (define (verify-proof provable debug)
   ((hash-ref provable 'verify) debug))
 
+
 (define (verify-all debug)
   (for-each
    (λ (p) ((hash-ref p 'verify) debug))
    provables*))
+
+(module+ test
+  (verify-all true))
 
 (define th1 '())
 
