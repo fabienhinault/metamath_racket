@@ -9,13 +9,6 @@
 
 (define metamath-lexer
   (lexer
-   [(from/to "$(" "$)")
-    (token 'COMMENT (trim-ends "$(" lexeme "$)")
-           #:position (+ (pos lexeme-start) 2)
-           #:line (line lexeme-start)
-           #:column (+ (col lexeme-start) 2)
-           #:span (- (pos lexeme-end)
-                     (pos lexeme-start) 4))]
    [(union #\space #\tab #\newline #\return #\page)
     (token lexeme
            #:skip? #t
@@ -23,13 +16,26 @@
            #:line (line lexeme-start)
            #:column (col lexeme-start)
            #:span 1)]
+   [(char-complement (char-range  #\! #\~))
+    (token 'FORBIDDEN lexeme
+           #:position (pos lexeme-start)
+           #:line (line lexeme-start)
+           #:column (col lexeme-start)
+           #:span 1)]
+   [(from/to "$(" "$)")
+    (token 'COMMENT (trim-ends "$(" lexeme "$)")
+           #:position (+ (pos lexeme-start) 2)
+           #:line (line lexeme-start)
+           #:column (+ (col lexeme-start) 2)
+           #:span (- (pos lexeme-end)
+                     (pos lexeme-start) 4))]
    [reserved-terms (token lexeme lexeme
                           #:position (pos lexeme-start)
                           #:line (line lexeme-start)
                           #:column (col lexeme-start)
                           #:span (- (pos lexeme-end)
                                     (pos lexeme-start)))]
-   [ #\$ (token '_DOLLAR lexeme
+   [ #\$ (token '_FORBIDDEN_DOLLAR lexeme
                 #:position (pos lexeme-start)
                 #:line (line lexeme-start)
                 #:column (col lexeme-start)

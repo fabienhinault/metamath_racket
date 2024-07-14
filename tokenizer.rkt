@@ -32,7 +32,7 @@
     ;                                                              1234567 10 13
     (check-pred list? unfinished-comment)
     (check-equal? (length unfinished-comment) 13)
-    (check-equal? (car unfinished-comment) (token '_DOLLAR "$"
+    (check-equal? (car unfinished-comment) (token '_FORBIDDEN_DOLLAR "$"
                                                   #:position 1
                                                   #:line 1
                                                   #:column 0
