@@ -58,15 +58,15 @@
   #'(define NAME (add-floating-hypothesis 'CONSTANT 'VARIABLE)))
 
 (define (add-floating-hypothesis constant variable)
-  (when (not (member constant constants*))
-    (error (~a constant " is not a constant.")))
-  (when (not (member variable variables*))
-    (error (~a variable " is not a variable.")))
-  (let ((res (create-floating-hypothesis constant variable)))
+  (let ((res (create-floating-hypothesis constant variable constants* variables*)))
     (set! floating-hypotheses* (cons (cons variable res) floating-hypotheses*))
     res))
 
-(define (create-floating-hypothesis constant variable)
+(define (create-floating-hypothesis constant variable all-constants all-variables)
+  (when (not (member constant all-constants))
+    (error (~a constant " is not a constant.")))
+  (when (not (member variable all-variables))
+    (error (~a variable " is not a variable.")))
   (hash
    'statement (list constant variable)
    'step (λ (stack pds) (cons (list constant variable) stack))))
