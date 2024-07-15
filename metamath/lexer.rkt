@@ -4,14 +4,13 @@
 (module+ test
   (require rackunit))
 
-(define-lex-abbrev reserved-terms (:or "$c"  "$." "${" "$}" "$v" "$d" "$f" "$e" "$a" "$p" "?" ))
+(define-lex-abbrev reserved-terms (:or "$c"  "$." "${" "$}" "$v" "$d" "$f" "$e" "$a" "$p" "$=" "?" ))
   
 
 (define metamath-lexer
   (lexer
    [(union #\space #\tab #\newline #\return #\page)
     (token lexeme
-           #:skip? #t
            #:position (pos lexeme-start)
            #:line (line lexeme-start)
            #:column (col lexeme-start)
@@ -24,6 +23,7 @@
            #:span 1)]
    [(from/to "$(" "$)")
     (token 'COMMENT (trim-ends "$(" lexeme "$)")
+           #:skip? #t
            #:position (+ (pos lexeme-start) 2)
            #:line (line lexeme-start)
            #:column (+ (col lexeme-start) 2)
