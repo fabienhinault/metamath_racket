@@ -23,25 +23,13 @@
    (apply-tokenizer-maker make-tokenizer "$( this is a comment $)")
    (list (token 'COMMENT " this is a comment "
                 ;         1234567 10 23456 19
+                #:skip? #t
                 #:position 3
                 #:line 1
                 #:column 2
                 #:span 19)))
 
-  (let ((unfinished-comment (apply-tokenizer-maker make-tokenizer "$( unfinished")))
-    ;                                                              1234567 10 13
-    (check-pred list? unfinished-comment)
-    (check-equal? (length unfinished-comment) 13)
-    (check-equal? (car unfinished-comment) (token '_FORBIDDEN_DOLLAR "$"
-                                                  #:position 1
-                                                  #:line 1
-                                                  #:column 0
-                                                  #:span 1))
-    (check-equal? (last unfinished-comment) (token '_LETTER-OR-DIGIT "d"
-                                                  #:position 13
-                                                  #:line 1
-                                                  #:column 12
-                                                  #:span 1)))
+  (check-exn exn:fail? (λ ()  (apply-tokenizer-maker make-tokenizer "$( unfinished")))
 
   (let ((constants (apply-tokenizer-maker make-tokenizer "$c + = $.")))
     ;                                                     123456789  chars
@@ -59,7 +47,7 @@
                                           #:column 2
                                           #:span 1
                                           #:skip? #t))
-    (check-equal? (caddr constants) (token '_MATH-SYMBOL-CHARACTER "+"
+    (check-equal? (caddr constants) (token '_MATH-SYMBOL "+"
                                           #:position 4
                                           #:line 1
                                           #:column 3
@@ -72,15 +60,15 @@
     )
   (let ((floating (apply-tokenizer-maker make-tokenizer "tt $f term t $.")))
     ;                                                    1234567 10 2 15   chars
-    ;                                                    1234 567 10  13   tokens
+    ;                                                    1 23 45   6789   tokens
     (check-pred list? floating)
-    (check-equal? (length floating) 13)
-    (check-equal? (car floating) (token '_LETTER-OR-DIGIT "t"
-                                                  #:position 1
-                                                  #:line 1
-                                                  #:column 0
-                                                  #:span 1))
-    (check-equal? (fourth floating) (token "$f" "$f"
+    (check-equal? (length floating) 9)
+    (check-equal? (car floating) (token '_LABEL "tt"
+                                        #:position 1
+                                        #:line 1
+                                        #:column 0
+                                        #:span 2))
+    (check-equal? (third floating) (token "$f" "$f"
                                             #:position 4
                                             #:line 1
                                             #:column 3
