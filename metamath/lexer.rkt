@@ -11,12 +11,7 @@
   (lexer
    [(union #\space #\tab #\newline #\return #\page)
     (token lexeme
-           #:position (pos lexeme-start)
-           #:line (line lexeme-start)
-           #:column (col lexeme-start)
-           #:span 1)]
-   [(char-complement (char-range  #\! #\~))
-    (token 'FORBIDDEN lexeme
+           #:skip? #t
            #:position (pos lexeme-start)
            #:line (line lexeme-start)
            #:column (col lexeme-start)
@@ -35,28 +30,19 @@
                           #:column (col lexeme-start)
                           #:span (- (pos lexeme-end)
                                     (pos lexeme-start)))]
-   [ #\$ (token '_FORBIDDEN_DOLLAR lexeme
-                #:position (pos lexeme-start)
-                #:line (line lexeme-start)
-                #:column (col lexeme-start)
-                #:span 1)]
-   [(union (char-range #\0 #\9) (char-range #\a #\z) (char-range #\A #\Z))
-    (token '_LETTER-OR-DIGIT lexeme
+   [(:+ (union (char-range #\0 #\9) (char-range #\a #\z) (char-range #\A #\Z) #\- #\. #\_))
+    (token '_LABEL lexeme
            #:position (pos lexeme-start)
            #:line (line lexeme-start)
            #:column (col lexeme-start)
-           #:span 1)]
-   [(:or #\- #\. #\_)
-    (token '_LABEL-CHARACTER lexeme
+           #:span (- (pos lexeme-end)
+                     (pos lexeme-start)))]
+   [(:+ (:- (char-range #\! #\~) #\$))
+    (token '_MATH-SYMBOL lexeme
            #:position (pos lexeme-start)
            #:line (line lexeme-start)
            #:column (col lexeme-start)
-           #:span 1)]
-   [(char-range #\! #\~)
-    (token '_MATH-SYMBOL-CHARACTER lexeme
-           #:position (pos lexeme-start)
-           #:line (line lexeme-start)
-           #:column (col lexeme-start)
-           #:span 1)]))
+           #:span (- (pos lexeme-end)
+                     (pos lexeme-start)))]))
 
 (provide metamath-lexer)
